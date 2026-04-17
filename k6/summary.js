@@ -259,7 +259,7 @@ function renderHtml(report) {
 export function makeHandleSummary(prefix = 'profile-mix') {
   return function handleSummary(data) {
     const report = buildBenchmark(data);
-    const base = `bench/results/${prefix}-${report.buildLabel}`;
+    const base = `results/${prefix}-${report.buildLabel}`;
 
     return {
       stdout: [

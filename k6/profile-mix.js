@@ -19,47 +19,51 @@ export const handleSummary = makeHandleSummary('profile-mix');
 //   ticker  — cheap read, high RPS, exercises controller + Jackson hot path
 //   list    — paginated DB read, exercises JPA + pageable + serialization
 //   search  — fulltext, exercises QueryDSL path
+//
+// Default rates are intentionally conservative for small app-direct benchmark boxes
+// such as 2 vCPU / 2 GB EC2 instances. Scale them up with env vars after you find
+// a stable baseline for your current build.
 
 export const options = {
   scenarios: {
     ticker: {
       executor: 'constant-arrival-rate',
       exec: 'ticker',
-      rate: Number(__ENV.TICKER_RPS || 20),
+      rate: Number(__ENV.TICKER_RPS || 6),
       timeUnit: '1s',
       duration: __ENV.DURATION || '6m',
-      preAllocatedVUs: Number(__ENV.TICKER_PRE_VUS || 10),
-      maxVUs: Number(__ENV.TICKER_MAX_VUS || 50),
+      preAllocatedVUs: Number(__ENV.TICKER_PRE_VUS || 6),
+      maxVUs: Number(__ENV.TICKER_MAX_VUS || 24),
       tags: { endpoint: 'ticker' },
     },
     listMain: {
       executor: 'constant-arrival-rate',
       exec: 'listMain',
-      rate: Number(__ENV.LIST_MAIN_RPS || 70),
+      rate: Number(__ENV.LIST_MAIN_RPS || 20),
       timeUnit: '1s',
       duration: __ENV.DURATION || '6m',
-      preAllocatedVUs: Number(__ENV.LIST_MAIN_PRE_VUS || 20),
-      maxVUs: Number(__ENV.LIST_MAIN_MAX_VUS || 100),
+      preAllocatedVUs: Number(__ENV.LIST_MAIN_PRE_VUS || 12),
+      maxVUs: Number(__ENV.LIST_MAIN_MAX_VUS || 48),
       tags: { endpoint: 'list_main' },
     },
     listCategory: {
       executor: 'constant-arrival-rate',
       exec: 'listCategory',
-      rate: Number(__ENV.LIST_CATEGORY_RPS || 10),
+      rate: Number(__ENV.LIST_CATEGORY_RPS || 3),
       timeUnit: '1s',
       duration: __ENV.DURATION || '6m',
-      preAllocatedVUs: Number(__ENV.LIST_CATEGORY_PRE_VUS || 8),
-      maxVUs: Number(__ENV.LIST_CATEGORY_MAX_VUS || 50),
+      preAllocatedVUs: Number(__ENV.LIST_CATEGORY_PRE_VUS || 4),
+      maxVUs: Number(__ENV.LIST_CATEGORY_MAX_VUS || 20),
       tags: { endpoint: 'list_category' },
     },
     search: {
       executor: 'constant-arrival-rate',
       exec: 'search',
-      rate: Number(__ENV.SEARCH_RPS || 10),
+      rate: Number(__ENV.SEARCH_RPS || 2),
       timeUnit: '1s',
       duration: __ENV.DURATION || '6m',
-      preAllocatedVUs: Number(__ENV.SEARCH_PRE_VUS || 6),
-      maxVUs: Number(__ENV.SEARCH_MAX_VUS || 40),
+      preAllocatedVUs: Number(__ENV.SEARCH_PRE_VUS || 4),
+      maxVUs: Number(__ENV.SEARCH_MAX_VUS || 16),
       tags: { endpoint: 'search' },
     },
   },
