@@ -10,6 +10,13 @@ from pathlib import Path
 def parse_time(value):
     if value.endswith("Z"):
         value = value[:-1] + "+00:00"
+    if "." in value:
+        main, rest = value.split(".", 1)
+        tz_index = max(rest.find("+"), rest.find("-"))
+        if tz_index != -1:
+            fractional = rest[:tz_index]
+            timezone = rest[tz_index:]
+            value = f"{main}.{fractional[:6]}{timezone}"
     return datetime.fromisoformat(value)
 
 
