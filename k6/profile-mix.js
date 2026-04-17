@@ -20,7 +20,7 @@ export const handleSummary = makeHandleSummary('profile-mix');
 //   list    — paginated DB read, exercises JPA + pageable + serialization
 //   search  — fulltext, exercises QueryDSL path
 //
-// Default rates target roughly 70 RPS total on small app-direct benchmark boxes
+// Default rates target roughly 50 RPS total on small app-direct benchmark boxes
 // such as 2 vCPU / 2 GB EC2 instances. Scale them with env vars once you find
 // the stable comparison point for your current build.
 
@@ -29,7 +29,7 @@ export const options = {
     ticker: {
       executor: 'constant-arrival-rate',
       exec: 'ticker',
-      rate: Number(__ENV.TICKER_RPS || 12),
+      rate: Number(__ENV.TICKER_RPS || 9),
       timeUnit: '1s',
       duration: __ENV.DURATION || '6m',
       preAllocatedVUs: Number(__ENV.TICKER_PRE_VUS || 8),
@@ -39,7 +39,7 @@ export const options = {
     listMain: {
       executor: 'constant-arrival-rate',
       exec: 'listMain',
-      rate: Number(__ENV.LIST_MAIN_RPS || 45),
+      rate: Number(__ENV.LIST_MAIN_RPS || 32),
       timeUnit: '1s',
       duration: __ENV.DURATION || '6m',
       preAllocatedVUs: Number(__ENV.LIST_MAIN_PRE_VUS || 16),
@@ -49,7 +49,7 @@ export const options = {
     listCategory: {
       executor: 'constant-arrival-rate',
       exec: 'listCategory',
-      rate: Number(__ENV.LIST_CATEGORY_RPS || 7),
+      rate: Number(__ENV.LIST_CATEGORY_RPS || 5),
       timeUnit: '1s',
       duration: __ENV.DURATION || '6m',
       preAllocatedVUs: Number(__ENV.LIST_CATEGORY_PRE_VUS || 6),
@@ -59,7 +59,7 @@ export const options = {
     search: {
       executor: 'constant-arrival-rate',
       exec: 'search',
-      rate: Number(__ENV.SEARCH_RPS || 6),
+      rate: Number(__ENV.SEARCH_RPS || 4),
       timeUnit: '1s',
       duration: __ENV.DURATION || '6m',
       preAllocatedVUs: Number(__ENV.SEARCH_PRE_VUS || 6),
