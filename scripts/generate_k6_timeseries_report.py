@@ -311,7 +311,7 @@ def render_html(report):
       const svg = document.getElementById(svgId);
       const width = 1200;
       const height = 480;
-      const margin = {{ top: 18, right: 18, bottom: 42, left: 64 }};
+      const margin = {{ top: 18, right: 18, bottom: 64, left: 64 }};
       const innerWidth = width - margin.left - margin.right;
       const innerHeight = height - margin.top - margin.bottom;
       const labels = report.labels;
@@ -338,11 +338,11 @@ def render_html(report):
         const x = margin.left + ratio * innerWidth;
         const labelIndex = Math.min(labels.length - 1, Math.round(ratio * (labels.length - 1)));
         content += `<line x1="${{x}}" y1="${{margin.top}}" x2="${{x}}" y2="${{height - margin.bottom}}" stroke="${{css('--grid')}}" stroke-dasharray="4 4" />`;
-        content += `<text x="${{x}}" y="${{height - 14}}" text-anchor="middle" fill="${{css('--muted')}}" font-size="12">${{labels[labelIndex]}}s</text>`;
+        content += `<text x="${{x}}" y="${{height - 30}}" text-anchor="middle" fill="${{css('--muted')}}" font-size="12">${{labels[labelIndex]}}s</text>`;
       }}
 
       content += `<text x="${{margin.left - 42}}" y="${{margin.top + innerHeight / 2}}" transform="rotate(-90 ${{margin.left - 42}} ${{margin.top + innerHeight / 2}})" text-anchor="middle" fill="${{css('--text')}}" font-size="16">RPS</text>`;
-      content += `<text x="${{margin.left + innerWidth / 2}}" y="${{height - 4}}" text-anchor="middle" fill="${{css('--text')}}" font-size="16">Time since start (seconds)</text>`;
+      content += `<text x="${{margin.left + innerWidth / 2}}" y="${{height - 8}}" text-anchor="middle" fill="${{css('--text')}}" font-size="16">Time since start (seconds)</text>`;
 
       names.forEach((name, index) => {{
         const values = seriesMap[name];
