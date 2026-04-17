@@ -2,22 +2,28 @@
 
 import argparse
 import json
+import re
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
 
 def parse_time(value):
-    if value.endswith("Z"):
-        value = value[:-1] + "+00:00"
-    if "." in value:
-        main, rest = value.split(".", 1)
-        tz_index = max(rest.find("+"), rest.find("-"))
-        if tz_index != -1:
-            fractional = rest[:tz_index]
-            timezone = rest[tz_index:]
-            value = f"{main}.{fractional[:6]}{timezone}"
-    return datetime.fromisoformat(value)
+    value = value.strip()
+    match = re.match(
+        r"^(?P<date>\d{4}-\d{2}-\d{2})T"
+        r"(?P<time>\d{2}:\d{2}:\d{2})"
+        r"(?:\.(?P<fraction>\d+))?"
+        r"(?P<tz>Z|[+-]\d{2}:\d{2})$",
+        value,
+    )
+    if not match:
+        raise ValueError(f"Unsupported timestamp format: {value}")
+
+    fraction = (match.group("fraction") or "0")[:6].ljust(6, "0")
+    timezone = "+0000" if match.group("tz") == "Z" else match.group("tz").replace(":", "")
+    normalized = f"{match.group('date')}T{match.group('time')}.{fraction}{timezone}"
+    return datetime.strptime(normalized, "%Y-%m-%dT%H:%M:%S.%f%z")
 
 
 def load_series(input_path):
