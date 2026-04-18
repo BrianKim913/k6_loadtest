@@ -26,7 +26,7 @@ def parse_time(value):
     return datetime.strptime(normalized, "%Y-%m-%dT%H:%M:%S.%f%z")
 
 
-def load_series(input_path):
+def load_series(input_path, bucket_ms=100):
     total_counts = defaultdict(int)
     endpoint_counts = defaultdict(lambda: defaultdict(int))
     first_ts = None
@@ -49,13 +49,13 @@ def load_series(input_path):
                 continue
 
             dt = parse_time(timestamp)
-            epoch_second = int(dt.timestamp())
-            total_counts[epoch_second] += 1
+            bucket = (int(dt.timestamp() * 1000) // bucket_ms) * bucket_ms
+            total_counts[bucket] += 1
             total_requests += 1
 
             endpoint = (data.get("tags") or {}).get("endpoint")
             if endpoint:
-                endpoint_counts[endpoint][epoch_second] += 1
+                endpoint_counts[endpoint][bucket] += 1
 
             if first_ts is None or dt < first_ts:
                 first_ts = dt
@@ -65,15 +65,21 @@ def load_series(input_path):
     if first_ts is None or last_ts is None:
         raise ValueError("No http_reqs points found in the input file.")
 
-    start_second = int(first_ts.timestamp())
-    end_second = int(last_ts.timestamp())
-    seconds = list(range(start_second, end_second + 1))
-    labels = [second - start_second for second in seconds]
-    total_series = [total_counts.get(second, 0) for second in seconds]
+    start_bucket = (int(first_ts.timestamp() * 1000) // bucket_ms) * bucket_ms
+    end_bucket = (int(last_ts.timestamp() * 1000) // bucket_ms) * bucket_ms
+    buckets = list(range(start_bucket, end_bucket + bucket_ms, bucket_ms))
+    bucket_sec = bucket_ms / 1000
+    labels = [round((b - start_bucket) / 1000, 3) for b in buckets]
+
+    # Scale counts to RPS (counts per bucket → requests per second)
+    scale = 1000 / bucket_ms
+    total_series = [round(total_counts.get(b, 0) * scale, 2) for b in buckets]
 
     endpoint_series = {}
     for endpoint, counts in sorted(endpoint_counts.items()):
-        endpoint_series[endpoint] = [counts.get(second, 0) for second in seconds]
+        endpoint_series[endpoint] = [round(counts.get(b, 0) * scale, 2) for b in buckets]
+
+    duration_seconds = (end_bucket - start_bucket) / 1000 + bucket_sec
 
     return {
         "labels": labels,
@@ -81,9 +87,9 @@ def load_series(input_path):
         "endpoint_series": endpoint_series,
         "start_iso": first_ts.isoformat(),
         "end_iso": last_ts.isoformat(),
-        "duration_seconds": len(seconds),
+        "duration_seconds": round(duration_seconds, 1),
         "total_requests": total_requests,
-        "avg_rps": total_requests / max(len(seconds), 1),
+        "avg_rps": round(total_requests / max(duration_seconds, 1), 2),
         "peak_rps": max(total_series) if total_series else 0,
     }
 
@@ -402,11 +408,13 @@ def main():
     parser.add_argument("-o", "--output", required=True, help="Path to the output HTML file")
     parser.add_argument("--build-label", default="unknown-build", help="Build label shown in the chart title")
     parser.add_argument("--run-name", default="profile-mix", help="Logical run name shown in the subtitle")
+    parser.add_argument("--bucket", type=float, default=0.1, help="Bucket size in seconds (e.g. 0.1, 0.5, 1). Default: 0.1")
     args = parser.parse_args()
 
     input_path = Path(args.input)
     output_path = Path(args.output)
-    dataset = load_series(input_path)
+    bucket_ms = max(1, int(args.bucket * 1000))
+    dataset = load_series(input_path, bucket_ms=bucket_ms)
     report = build_report(dataset, args.build_label, args.run_name)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
