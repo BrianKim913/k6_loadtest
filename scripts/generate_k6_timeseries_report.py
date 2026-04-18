@@ -345,9 +345,17 @@ def render_html(report):
     </div>
 
     <div class="panel">
-      <h2>P95 Latency by Endpoint</h2>
+      <h2>P95 Latency by Endpoint (excl. search)</h2>
       <div class="legend" id="latency-endpoint-legend"></div>
       <svg id="latency-endpoint-chart" viewBox="0 0 1200 480" preserveAspectRatio="none"></svg>
+    </div>
+
+    <div class="panel">
+      <h2>P95 Latency — Search</h2>
+      <div class="legend">
+        <span><i style="background: var(--line4)"></i>search</span>
+      </div>
+      <svg id="latency-search-chart" viewBox="0 0 1200 480" preserveAspectRatio="none"></svg>
     </div>
   </div>
 
@@ -442,10 +450,15 @@ def render_html(report):
     buildChart('latency-total-chart', {{ 'P95 ms': report.latency_total }}, {{ area: false, yLabel: 'ms' }});
 
     const latencyEndpoints = report.latency_endpoints;
-    buildChart('latency-endpoint-chart', latencyEndpoints, {{ area: false, yLabel: 'ms' }});
-    document.getElementById('latency-endpoint-legend').innerHTML = Object.keys(latencyEndpoints).map((name, i) =>
+    const latencyNoSearch = Object.fromEntries(Object.entries(latencyEndpoints).filter(([k]) => k !== 'search'));
+    const latencySearch = latencyEndpoints['search'] ? {{ search: latencyEndpoints['search'] }} : {{}};
+    buildChart('latency-endpoint-chart', latencyNoSearch, {{ area: false, yLabel: 'ms' }});
+    document.getElementById('latency-endpoint-legend').innerHTML = Object.keys(latencyNoSearch).map((name, i) =>
       `<span><i style="background:${{colors[i % colors.length]}}"></i>${{escapeXml(name)}}</span>`
     ).join('');
+    if (Object.keys(latencySearch).length) {{
+      buildChart('latency-search-chart', latencySearch, {{ area: false, yLabel: 'ms' }});
+    }}
   </script>
 </body>
 </html>"""

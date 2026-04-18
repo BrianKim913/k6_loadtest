@@ -56,8 +56,12 @@ function endpointRow(data, metricName, label, durationMs) {
   const statusCounts = collectStatusCounts(data, metricName);
 
   const totalFromStatus = Object.values(statusCounts).reduce((a, b) => a + b, 0);
+  const errorCountFromStatus = Object.entries(statusCounts)
+    .filter(([status]) => Number(status) >= 400)
+    .reduce((sum, [, count]) => sum + count, 0);
   const total = safeValue(requests, 'count') || totalFromStatus;
   const rps = safeValue(requests, 'rate') || (durationMs > 0 ? total / (durationMs / 1000) : 0);
+  const errorRate = safeValue(failures, 'rate') || (total > 0 ? errorCountFromStatus / total : 0);
 
   return {
     label,
@@ -67,7 +71,7 @@ function endpointRow(data, metricName, label, durationMs) {
     p95: safeValue(duration, 'p(95)'),
     p99: safeValue(duration, 'p(99)'),
     max: safeValue(duration, 'max'),
-    errorRate: safeValue(failures, 'rate'),
+    errorRate,
     statusCounts,
     statusSummary: formatStatusCounts(statusCounts),
   };
