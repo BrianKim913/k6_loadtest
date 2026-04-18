@@ -128,6 +128,7 @@ def load_series(input_path, bucket_ms=100, latency_bucket_ms=3000):
         "total_requests": total_requests,
         "avg_rps": round(total_requests / max(duration_seconds, 1), 2),
         "peak_rps": max(total_series) if total_series else 0,
+        "bucket_sec": bucket_sec,
     }
 
 
@@ -146,23 +147,27 @@ def moving_average(values, window):
     return averaged
 
 
-def build_report(dataset, build_label, run_name):
-    total_smoothed = moving_average(dataset["total_series"], 5)
+def build_report(dataset, build_label, run_name, trim_start_sec=0):
+    trim = max(0, int(trim_start_sec / dataset["bucket_sec"]))
+
+    labels = [round(v - dataset["labels"][trim], 3) for v in dataset["labels"][trim:]]
+
+    total_smoothed = moving_average(dataset["total_series"][trim:], 5)
     endpoint_smoothed = {
-        endpoint: moving_average(series, 5)
+        endpoint: moving_average(series[trim:], 5)
         for endpoint, series in dataset["endpoint_series"].items()
     }
-    latency_total_smoothed = moving_average(dataset["latency_p95_total"], 5)
+    latency_total_smoothed = moving_average(dataset["latency_p95_total"][trim:], 5)
     latency_endpoints_smoothed = {
-        endpoint: moving_average(series, 5)
+        endpoint: moving_average(series[trim:], 5)
         for endpoint, series in dataset["latency_p95_endpoints"].items()
     }
 
     return {
         "build_label": build_label,
         "run_name": run_name,
-        "labels": dataset["labels"],
-        "total_series": dataset["total_series"],
+        "labels": labels,
+        "total_series": dataset["total_series"][trim:],
         "total_smoothed": total_smoothed,
         "endpoint_series": endpoint_smoothed,
         "latency_total": latency_total_smoothed,
@@ -488,6 +493,7 @@ def main():
     parser.add_argument("--run-name", default="profile-mix", help="Logical run name shown in the subtitle")
     parser.add_argument("--bucket", type=float, default=0.1, help="RPS bucket size in seconds. Default: 0.1")
     parser.add_argument("--latency-bucket", type=float, default=3.0, help="Latency bucket size in seconds. Default: 3.0")
+    parser.add_argument("--trim-start", type=float, default=2.0, help="Seconds to trim from the start (skip VU spin-up). Default: 2.0")
     args = parser.parse_args()
 
     input_path = Path(args.input)
@@ -495,7 +501,7 @@ def main():
     bucket_ms = max(1, int(args.bucket * 1000))
     latency_bucket_ms = max(bucket_ms, int(args.latency_bucket * 1000))
     dataset = load_series(input_path, bucket_ms=bucket_ms, latency_bucket_ms=latency_bucket_ms)
-    report = build_report(dataset, args.build_label, args.run_name)
+    report = build_report(dataset, args.build_label, args.run_name, trim_start_sec=args.trim_start)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(render_html(report), encoding="utf-8")

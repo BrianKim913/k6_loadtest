@@ -53,6 +53,7 @@ export const options = {
       duration: __ENV.DURATION || '6m',
       preAllocatedVUs: Number(__ENV.TICKER_PRE_VUS || 8),
       maxVUs: Number(__ENV.TICKER_MAX_VUS || 32),
+      gracefulStop: '0s',
       tags: { endpoint: 'ticker' },
     },
     listMain: {
@@ -63,6 +64,7 @@ export const options = {
       duration: __ENV.DURATION || '6m',
       preAllocatedVUs: Number(__ENV.LIST_MAIN_PRE_VUS || 16),
       maxVUs: Number(__ENV.LIST_MAIN_MAX_VUS || 64),
+      gracefulStop: '0s',
       tags: { endpoint: 'list_main' },
     },
     listCategory: {
@@ -73,6 +75,7 @@ export const options = {
       duration: __ENV.DURATION || '6m',
       preAllocatedVUs: Number(__ENV.LIST_CATEGORY_PRE_VUS || 6),
       maxVUs: Number(__ENV.LIST_CATEGORY_MAX_VUS || 24),
+      gracefulStop: '0s',
       tags: { endpoint: 'list_category' },
     },
     search: {
@@ -83,6 +86,7 @@ export const options = {
       duration: __ENV.DURATION || '6m',
       preAllocatedVUs: Number(__ENV.SEARCH_PRE_VUS || 6),
       maxVUs: Number(__ENV.SEARCH_MAX_VUS || 24),
+      gracefulStop: '0s',
       tags: { endpoint: 'search' },
     },
   },
