@@ -26,9 +26,23 @@ def parse_time(value):
     return datetime.strptime(normalized, "%Y-%m-%dT%H:%M:%S.%f%z")
 
 
+def percentile(values, p):
+    if not values:
+        return 0.0
+    sorted_vals = sorted(values)
+    idx = (len(sorted_vals) - 1) * p / 100
+    lo = int(idx)
+    hi = lo + 1
+    if hi >= len(sorted_vals):
+        return round(sorted_vals[lo], 2)
+    return round(sorted_vals[lo] + (idx - lo) * (sorted_vals[hi] - sorted_vals[lo]), 2)
+
+
 def load_series(input_path, bucket_ms=100):
     total_counts = defaultdict(int)
     endpoint_counts = defaultdict(lambda: defaultdict(int))
+    latency_buckets = defaultdict(list)
+    endpoint_latency_buckets = defaultdict(lambda: defaultdict(list))
     first_ts = None
     last_ts = None
     total_requests = 0
@@ -40,7 +54,11 @@ def load_series(input_path, bucket_ms=100):
                 continue
 
             row = json.loads(line)
-            if row.get("type") != "Point" or row.get("metric") != "http_reqs":
+            if row.get("type") != "Point":
+                continue
+
+            metric = row.get("metric")
+            if metric not in ("http_reqs", "http_req_duration"):
                 continue
 
             data = row.get("data", {})
@@ -50,17 +68,24 @@ def load_series(input_path, bucket_ms=100):
 
             dt = parse_time(timestamp)
             bucket = (int(dt.timestamp() * 1000) // bucket_ms) * bucket_ms
-            total_counts[bucket] += 1
-            total_requests += 1
-
             endpoint = (data.get("tags") or {}).get("endpoint")
-            if endpoint:
-                endpoint_counts[endpoint][bucket] += 1
 
-            if first_ts is None or dt < first_ts:
-                first_ts = dt
-            if last_ts is None or dt > last_ts:
-                last_ts = dt
+            if metric == "http_reqs":
+                total_counts[bucket] += 1
+                total_requests += 1
+                if endpoint:
+                    endpoint_counts[endpoint][bucket] += 1
+                if first_ts is None or dt < first_ts:
+                    first_ts = dt
+                if last_ts is None or dt > last_ts:
+                    last_ts = dt
+
+            elif metric == "http_req_duration":
+                value = data.get("value")
+                if value is not None:
+                    latency_buckets[bucket].append(value)
+                    if endpoint:
+                        endpoint_latency_buckets[endpoint][bucket].append(value)
 
     if first_ts is None or last_ts is None:
         raise ValueError("No http_reqs points found in the input file.")
@@ -71,7 +96,6 @@ def load_series(input_path, bucket_ms=100):
     bucket_sec = bucket_ms / 1000
     labels = [round((b - start_bucket) / 1000, 3) for b in buckets]
 
-    # Scale counts to RPS (counts per bucket → requests per second)
     scale = 1000 / bucket_ms
     total_series = [round(total_counts.get(b, 0) * scale, 2) for b in buckets]
 
@@ -79,12 +103,20 @@ def load_series(input_path, bucket_ms=100):
     for endpoint, counts in sorted(endpoint_counts.items()):
         endpoint_series[endpoint] = [round(counts.get(b, 0) * scale, 2) for b in buckets]
 
+    latency_p95_total = [percentile(latency_buckets.get(b, []), 95) for b in buckets]
+
+    latency_p95_endpoints = {}
+    for endpoint, buckets_map in sorted(endpoint_latency_buckets.items()):
+        latency_p95_endpoints[endpoint] = [percentile(buckets_map.get(b, []), 95) for b in buckets]
+
     duration_seconds = (end_bucket - start_bucket) / 1000 + bucket_sec
 
     return {
         "labels": labels,
         "total_series": total_series,
         "endpoint_series": endpoint_series,
+        "latency_p95_total": latency_p95_total,
+        "latency_p95_endpoints": latency_p95_endpoints,
         "start_iso": first_ts.isoformat(),
         "end_iso": last_ts.isoformat(),
         "duration_seconds": round(duration_seconds, 1),
@@ -115,6 +147,11 @@ def build_report(dataset, build_label, run_name):
         endpoint: moving_average(series, 5)
         for endpoint, series in dataset["endpoint_series"].items()
     }
+    latency_total_smoothed = moving_average(dataset["latency_p95_total"], 5)
+    latency_endpoints_smoothed = {
+        endpoint: moving_average(series, 5)
+        for endpoint, series in dataset["latency_p95_endpoints"].items()
+    }
 
     return {
         "build_label": build_label,
@@ -123,6 +160,8 @@ def build_report(dataset, build_label, run_name):
         "total_series": dataset["total_series"],
         "total_smoothed": total_smoothed,
         "endpoint_series": endpoint_smoothed,
+        "latency_total": latency_total_smoothed,
+        "latency_endpoints": latency_endpoints_smoothed,
         "start_iso": dataset["start_iso"],
         "end_iso": dataset["end_iso"],
         "duration_seconds": dataset["duration_seconds"],
@@ -257,7 +296,7 @@ def render_html(report):
   <div class="wrap">
     <div class="header">
       <div>
-        <h1 class="title">{escape_html(report["build_label"])} RPS Over Time</h1>
+        <h1 class="title">{escape_html(report["build_label"])} — Load Report</h1>
         <p class="subtitle">{escape_html(report["run_name"])} | {escape_html(report["start_iso"])} to {escape_html(report["end_iso"])}</p>
       </div>
     </div>
@@ -284,7 +323,7 @@ def render_html(report):
     <div class="panel">
       <h2>Total RPS</h2>
       <div class="legend">
-        <span><i style="background: var(--accent)"></i>5-second moving average</span>
+        <span><i style="background: var(--accent)"></i>5-bucket moving average</span>
       </div>
       <svg id="total-chart" viewBox="0 0 1200 480" preserveAspectRatio="none"></svg>
     </div>
@@ -293,7 +332,22 @@ def render_html(report):
       <h2>Endpoint RPS</h2>
       <div class="legend" id="endpoint-legend"></div>
       <svg id="endpoint-chart" viewBox="0 0 1200 480" preserveAspectRatio="none"></svg>
-      <div class="footer">Endpoint chart also uses a 5-second moving average to reduce k6 per-second jitter.</div>
+      <div class="footer">5-bucket moving average to reduce per-bucket jitter.</div>
+    </div>
+
+    <div class="panel">
+      <h2>P95 Latency Over Time</h2>
+      <div class="legend">
+        <span><i style="background: var(--accent)"></i>Total P95 (smoothed)</span>
+      </div>
+      <svg id="latency-total-chart" viewBox="0 0 1200 480" preserveAspectRatio="none"></svg>
+      <div class="footer">High latency at the start = JVM warmup. Native image should be flat from second 0.</div>
+    </div>
+
+    <div class="panel">
+      <h2>P95 Latency by Endpoint</h2>
+      <div class="legend" id="latency-endpoint-legend"></div>
+      <svg id="latency-endpoint-chart" viewBox="0 0 1200 480" preserveAspectRatio="none"></svg>
     </div>
   </div>
 
@@ -313,7 +367,8 @@ def render_html(report):
         .replaceAll("'", '&apos;');
     }}
 
-    function buildChart(svgId, seriesMap, options = {{ area: false }}) {{
+    function buildChart(svgId, seriesMap, options = {{}}) {{
+      const {{ area = false, yLabel = 'RPS' }} = options;
       const svg = document.getElementById(svgId);
       const width = 1200;
       const height = 480;
@@ -347,7 +402,7 @@ def render_html(report):
         content += `<text x="${{x}}" y="${{height - 30}}" text-anchor="middle" fill="${{css('--muted')}}" font-size="12">${{labels[labelIndex]}}s</text>`;
       }}
 
-      content += `<text x="${{margin.left - 42}}" y="${{margin.top + innerHeight / 2}}" transform="rotate(-90 ${{margin.left - 42}} ${{margin.top + innerHeight / 2}})" text-anchor="middle" fill="${{css('--text')}}" font-size="16">RPS</text>`;
+      content += `<text x="${{margin.left - 42}}" y="${{margin.top + innerHeight / 2}}" transform="rotate(-90 ${{margin.left - 42}} ${{margin.top + innerHeight / 2}})" text-anchor="middle" fill="${{css('--text')}}" font-size="16">${{escapeXml(yLabel)}}</text>`;
       content += `<text x="${{margin.left + innerWidth / 2}}" y="${{height - 8}}" text-anchor="middle" fill="${{css('--text')}}" font-size="16">Time since start (seconds)</text>`;
 
       names.forEach((name, index) => {{
@@ -359,7 +414,7 @@ def render_html(report):
           return `${{x.toFixed(2)}},${{y.toFixed(2)}}`;
         }}).join(' ');
 
-        if (options.area && index === 0) {{
+        if (area && index === 0) {{
           const areaPoints = [
             `${{margin.left}},${{height - margin.bottom}}`,
             points,
@@ -368,27 +423,32 @@ def render_html(report):
           content += `<polygon points="${{areaPoints}}" fill="${{css('--fill')}}" />`;
         }}
 
-        content += `<polyline points="${{points}}" fill="none" stroke="${{color}}" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" />`;
+        content += `<polyline points="${{points}}" fill="none" stroke="${{color}}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" />`;
       }});
 
       svg.innerHTML = content;
     }}
 
-    const totalSeries = {{ 'Total RPS': report.total_smoothed }};
-    buildChart('total-chart', totalSeries, {{ area: true }});
+    const colors = [css('--accent'), css('--line2'), css('--line3'), css('--line4'), css('--line5')];
+
+    buildChart('total-chart', {{ 'Total RPS': report.total_smoothed }}, {{ area: true, yLabel: 'RPS' }});
 
     const endpointSeries = report.endpoint_series;
-    buildChart('endpoint-chart', endpointSeries, {{ area: false }});
+    buildChart('endpoint-chart', endpointSeries, {{ area: false, yLabel: 'RPS' }});
+    document.getElementById('endpoint-legend').innerHTML = Object.keys(endpointSeries).map((name, i) =>
+      `<span><i style="background:${{colors[i % colors.length]}}"></i>${{escapeXml(name)}}</span>`
+    ).join('');
 
-    const endpointLegend = document.getElementById('endpoint-legend');
-    const endpointColors = [css('--accent'), css('--line2'), css('--line3'), css('--line4'), css('--line5')];
-    endpointLegend.innerHTML = Object.keys(endpointSeries).map((name, index) =>
-      `<span><i style="background:${{endpointColors[index % endpointColors.length]}}"></i>${{escapeXml(name)}}</span>`
+    buildChart('latency-total-chart', {{ 'P95 ms': report.latency_total }}, {{ area: false, yLabel: 'ms' }});
+
+    const latencyEndpoints = report.latency_endpoints;
+    buildChart('latency-endpoint-chart', latencyEndpoints, {{ area: false, yLabel: 'ms' }});
+    document.getElementById('latency-endpoint-legend').innerHTML = Object.keys(latencyEndpoints).map((name, i) =>
+      `<span><i style="background:${{colors[i % colors.length]}}"></i>${{escapeXml(name)}}</span>`
     ).join('');
   </script>
 </body>
-</html>
-"""
+</html>"""
 
 
 def escape_html(value):
