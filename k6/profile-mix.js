@@ -1,5 +1,6 @@
 import http from 'k6/http';
 import { check } from 'k6';
+import { Counter } from 'k6/metrics';
 import { makeHandleSummary } from './summary.js';
 import {
   BASE_URL,
@@ -10,6 +11,14 @@ import {
 } from './config.js';
 
 export const handleSummary = makeHandleSummary('profile-mix');
+const responseStatusTotal = new Counter('response_status_total');
+
+function recordStatus(endpoint, res) {
+  responseStatusTotal.add(1, {
+    endpoint,
+    status: String(res.status),
+  });
+}
 
 // Mixed read-heavy workload for the PGO profiling run.
 // IMPORTANT: this must mirror the traffic shape you will benchmark with.
@@ -79,6 +88,7 @@ export const options = {
 export function ticker() {
   const res = http.get(`${BASE_URL}/api/articles/trending-ticker?limit=20`,
     { tags: { endpoint: 'ticker' } });
+  recordStatus('ticker', res);
   check(res, { 'ticker 200': (r) => r.status === 200 });
 }
 
@@ -88,6 +98,7 @@ export function listMain() {
     `${BASE_URL}/api/articles?page=${page}&size=9`,
     { tags: { endpoint: 'list_main' } },
   );
+  recordStatus('list_main', res);
   check(res, { 'list main 200': (r) => r.status === 200 });
 }
 
@@ -98,6 +109,7 @@ export function listCategory() {
     `${BASE_URL}/api/articles?category=${category}&page=${page}&size=9`,
     { tags: { endpoint: 'list_category' } },
   );
+  recordStatus('list_category', res);
   check(res, { 'list category 200': (r) => r.status === 200 });
 }
 
@@ -108,5 +120,6 @@ export function search() {
     `${BASE_URL}/api/articles/search/fulltext?q=${encodeURIComponent(q)}&page=${page}&size=20`,
     { tags: { endpoint: 'search' } },
   );
+  recordStatus('search', res);
   check(res, { 'search 200': (r) => r.status === 200 });
 }
