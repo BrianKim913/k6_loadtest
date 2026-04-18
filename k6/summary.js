@@ -49,16 +49,20 @@ function collectStatusCounts(data, endpoint) {
   return counts;
 }
 
-function endpointRow(data, metricName, label) {
+function endpointRow(data, metricName, label, durationMs) {
   const duration = safeMetric(data, `http_req_duration{endpoint:${metricName}}`);
   const requests = safeMetric(data, `http_reqs{endpoint:${metricName}}`);
   const failures = safeMetric(data, `http_req_failed{endpoint:${metricName}}`);
   const statusCounts = collectStatusCounts(data, metricName);
 
+  const totalFromStatus = Object.values(statusCounts).reduce((a, b) => a + b, 0);
+  const total = safeValue(requests, 'count') || totalFromStatus;
+  const rps = safeValue(requests, 'rate') || (durationMs > 0 ? total / (durationMs / 1000) : 0);
+
   return {
     label,
-    rps: safeValue(requests, 'rate'),
-    total: safeValue(requests, 'count'),
+    rps,
+    total,
     p50: safeValue(duration, 'med'),
     p95: safeValue(duration, 'p(95)'),
     p99: safeValue(duration, 'p(99)'),
@@ -70,11 +74,12 @@ function endpointRow(data, metricName, label) {
 }
 
 function buildBenchmark(data) {
+  const durationMs = data.state && data.state.testRunDurationMs ? data.state.testRunDurationMs : 0;
   const rows = [
-    endpointRow(data, 'list_main', 'Articles List Main'),
-    endpointRow(data, 'list_category', 'Articles List Category'),
-    endpointRow(data, 'ticker', 'Trending Ticker'),
-    endpointRow(data, 'search', 'Articles Search'),
+    endpointRow(data, 'list_main', 'Articles List Main', durationMs),
+    endpointRow(data, 'list_category', 'Articles List Category', durationMs),
+    endpointRow(data, 'ticker', 'Trending Ticker', durationMs),
+    endpointRow(data, 'search', 'Articles Search', durationMs),
   ];
 
   const httpReqs = safeMetric(data, 'http_reqs');
@@ -93,7 +98,7 @@ function buildBenchmark(data) {
     buildLabel: __ENV.BUILD_LABEL || 'unknown-build',
     runName: __ENV.RUN_NAME || 'profile-mix',
     baseUrl: __ENV.BASE_URL || 'http://devport.kr',
-    duration: data.state && data.state.testRunDurationMs ? data.state.testRunDurationMs : 0,
+    duration: durationMs,
     totals: {
       rps: safeValue(httpReqs, 'rate'),
       requests: safeValue(httpReqs, 'count'),

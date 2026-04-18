@@ -43,6 +43,7 @@ function recordStatus(endpoint, res) {
 // the stable comparison point for your current build.
 
 export const options = {
+  summaryTrendStats: ['med', 'p(90)', 'p(95)', 'p(99)', 'min', 'max', 'avg'],
   scenarios: {
     ticker: {
       executor: 'constant-arrival-rate',
