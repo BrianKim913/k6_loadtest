@@ -38,7 +38,7 @@ def percentile(values, p):
     return round(sorted_vals[lo] + (idx - lo) * (sorted_vals[hi] - sorted_vals[lo]), 2)
 
 
-def load_series(input_path, bucket_ms=100):
+def load_series(input_path, bucket_ms=100, latency_bucket_ms=3000):
     total_counts = defaultdict(int)
     endpoint_counts = defaultdict(lambda: defaultdict(int))
     latency_buckets = defaultdict(list)
@@ -68,6 +68,7 @@ def load_series(input_path, bucket_ms=100):
 
             dt = parse_time(timestamp)
             bucket = (int(dt.timestamp() * 1000) // bucket_ms) * bucket_ms
+            lat_bucket = (int(dt.timestamp() * 1000) // latency_bucket_ms) * latency_bucket_ms
             endpoint = (data.get("tags") or {}).get("endpoint")
 
             if metric == "http_reqs":
@@ -83,9 +84,9 @@ def load_series(input_path, bucket_ms=100):
             elif metric == "http_req_duration":
                 value = data.get("value")
                 if value is not None:
-                    latency_buckets[bucket].append(value)
+                    latency_buckets[lat_bucket].append(value)
                     if endpoint:
-                        endpoint_latency_buckets[endpoint][bucket].append(value)
+                        endpoint_latency_buckets[endpoint][lat_bucket].append(value)
 
     if first_ts is None or last_ts is None:
         raise ValueError("No http_reqs points found in the input file.")
@@ -103,11 +104,15 @@ def load_series(input_path, bucket_ms=100):
     for endpoint, counts in sorted(endpoint_counts.items()):
         endpoint_series[endpoint] = [round(counts.get(b, 0) * scale, 2) for b in buckets]
 
-    latency_p95_total = [percentile(latency_buckets.get(b, []), 95) for b in buckets]
+    # Map each RPS bucket to its containing latency bucket
+    def to_lat_bucket(b):
+        return (b // latency_bucket_ms) * latency_bucket_ms
+
+    latency_p95_total = [percentile(latency_buckets.get(to_lat_bucket(b), []), 95) for b in buckets]
 
     latency_p95_endpoints = {}
     for endpoint, buckets_map in sorted(endpoint_latency_buckets.items()):
-        latency_p95_endpoints[endpoint] = [percentile(buckets_map.get(b, []), 95) for b in buckets]
+        latency_p95_endpoints[endpoint] = [percentile(buckets_map.get(to_lat_bucket(b), []), 95) for b in buckets]
 
     duration_seconds = (end_bucket - start_bucket) / 1000 + bucket_sec
 
@@ -481,13 +486,15 @@ def main():
     parser.add_argument("-o", "--output", required=True, help="Path to the output HTML file")
     parser.add_argument("--build-label", default="unknown-build", help="Build label shown in the chart title")
     parser.add_argument("--run-name", default="profile-mix", help="Logical run name shown in the subtitle")
-    parser.add_argument("--bucket", type=float, default=0.1, help="Bucket size in seconds (e.g. 0.1, 0.5, 1). Default: 0.1")
+    parser.add_argument("--bucket", type=float, default=0.1, help="RPS bucket size in seconds. Default: 0.1")
+    parser.add_argument("--latency-bucket", type=float, default=3.0, help="Latency bucket size in seconds. Default: 3.0")
     args = parser.parse_args()
 
     input_path = Path(args.input)
     output_path = Path(args.output)
     bucket_ms = max(1, int(args.bucket * 1000))
-    dataset = load_series(input_path, bucket_ms=bucket_ms)
+    latency_bucket_ms = max(bucket_ms, int(args.latency_bucket * 1000))
+    dataset = load_series(input_path, bucket_ms=bucket_ms, latency_bucket_ms=latency_bucket_ms)
     report = build_report(dataset, args.build_label, args.run_name)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
