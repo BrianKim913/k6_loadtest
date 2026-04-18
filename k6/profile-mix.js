@@ -11,13 +11,22 @@ import {
 } from './config.js';
 
 export const handleSummary = makeHandleSummary('profile-mix');
-const responseStatusTotal = new Counter('response_status_total');
+const KNOWN_ENDPOINTS = ['list_main', 'list_category', 'ticker', 'search'];
+const KNOWN_STATUSES = ['200', '400', '401', '403', '404', '429', '500', '502', '503', '504'];
+const statusCounters = {};
+
+for (const endpoint of KNOWN_ENDPOINTS) {
+  for (const status of KNOWN_STATUSES) {
+    statusCounters[`${endpoint}_${status}`] = new Counter(`response_status_${endpoint}_${status}`);
+  }
+}
 
 function recordStatus(endpoint, res) {
-  responseStatusTotal.add(1, {
-    endpoint,
-    status: String(res.status),
-  });
+  const status = String(res.status);
+  const counter = statusCounters[`${endpoint}_${status}`];
+  if (counter) {
+    counter.add(1);
+  }
 }
 
 // Mixed read-heavy workload for the PGO profiling run.

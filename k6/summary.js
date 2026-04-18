@@ -2,25 +2,6 @@ function safeMetric(data, name) {
   return data.metrics && data.metrics[name] ? data.metrics[name] : null;
 }
 
-function parseMetricName(name) {
-  const match = name.match(/^([^{}]+)(?:\{([^}]*)\})?$/);
-  if (!match) {
-    return { base: name, tags: {} };
-  }
-
-  const tags = {};
-  if (match[2]) {
-    for (const part of match[2].split(',')) {
-      const [key, value] = part.split(':');
-      if (key && value !== undefined) {
-        tags[key.trim()] = value.trim();
-      }
-    }
-  }
-
-  return { base: match[1], tags };
-}
-
 function safeValue(metric, key, fallback = 0) {
   if (!metric || !metric.values || metric.values[key] === undefined || metric.values[key] === null) {
     return fallback;
@@ -55,17 +36,14 @@ function barWidth(value, max) {
 
 function collectStatusCounts(data, endpoint) {
   const counts = {};
+  const knownStatuses = ['200', '400', '401', '403', '404', '429', '500', '502', '503', '504'];
 
-  for (const [metricName, metric] of Object.entries(data.metrics || {})) {
-    const parsed = parseMetricName(metricName);
-    if (parsed.base !== 'response_status_total') {
-      continue;
+  for (const status of knownStatuses) {
+    const metric = safeMetric(data, `response_status_${endpoint}_${status}`);
+    const count = safeValue(metric, 'count');
+    if (count > 0) {
+      counts[status] = count;
     }
-    if (parsed.tags.endpoint !== endpoint || !parsed.tags.status) {
-      continue;
-    }
-
-    counts[parsed.tags.status] = safeValue(metric, 'count');
   }
 
   return counts;
