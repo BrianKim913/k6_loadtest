@@ -1,0 +1,35 @@
+# macOS / editor noise
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Python cache / virtualenvs
+__pycache__/
+*.py[cod]
+.python-version
+.venv/
+venv/
+env/
+
+# Node / package-manager cache, if local tooling is added
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# k6 raw event streams can become very large.
+# Keep curated HTML summaries/charts in results/ trackable.
+results/raw-*.json
+results/*.ndjson
+results/*.log
+
+# Temporary generated files
+*.tmp
+*.temp
