@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>k6 Benchmark Report</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin: 32px;
+            color: #111827;
+            background: #f8fafc;
+        }
+
+        h1,
+        h2 {
+            margin: 0 0 12px;
+        }
+
+        p {
+            margin: 4px 0;
+        }
+
+        .meta,
+        .panel {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .stat {
+            background: #f8fafc;
+            border-radius: 10px;
+            padding: 14px;
+        }
+
+        .stat-label {
+            color: #6b7280;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            margin-top: 6px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        th,
+        td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #e5e7eb;
+            text-align: left;
+        }
+
+        th {
+            color: #4b5563;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .chart-row {
+            display: grid;
+            grid-template-columns: 180px 1fr 120px;
+            gap: 12px;
+            align-items: center;
+            margin: 10px 0;
+        }
+
+        .chart-label,
+        .chart-value {
+            font-size: 14px;
+        }
+
+        .bar-wrap {
+            height: 18px;
+            background: #e5e7eb;
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .bar {
+            height: 100%;
+            border-radius: 999px;
+        }
+
+        .bar.rps {
+            background: linear-gradient(90deg, #0f766e, #14b8a6);
+        }
+
+        .bar.latency {
+            background: linear-gradient(90deg, #b45309, #f59e0b);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="meta">
+        <h1>k6 Benchmark Report</h1>
+        <p><strong>Build:</strong> pgo</p>
+        <p><strong>Run:</strong> profile-mix</p>
+        <p><strong>Base URL:</strong> http://10.0.2.251:18080</p>
+        <p><strong>Duration:</strong> 360.01 s</p>
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-label">Total RPS</div>
+                <div class="stat-value">460.87</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">P95</div>
+                <div class="stat-value">26.51 ms</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">P99</div>
+                <div class="stat-value">134.23 ms</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Error Rate</div>
+                <div class="stat-value">0.00%</div>
+            </div>
+        </div>
+        <p><strong>Status Counts:</strong> 200:165917</p>
+    </div>
+
+    <div class="panel">
+        <h2>Endpoint Breakdown</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Endpoint</th>
+                    <th>RPS</th>
+                    <th>Total Requests</th>
+                    <th>P50</th>
+                    <th>P95</th>
+                    <th>P99</th>
+                    <th>Error Rate</th>
+                    <th>Status Counts</th>
+                </tr>
+            </thead>
+            <tbody>
+
+                <tr>
+                    <td>Articles List Main</td>
+                    <td>324.91</td>
+                    <td>116969</td>
+                    <td>3.36 ms</td>
+                    <td>25.01 ms</td>
+                    <td>115.34 ms</td>
+                    <td>0.00%</td>
+                    <td>200:116969</td>
+                </tr>
+
+                <tr>
+                    <td>Articles List Category</td>
+                    <td>49.98</td>
+                    <td>17992</td>
+                    <td>4.07 ms</td>
+                    <td>25.93 ms</td>
+                    <td>120.97 ms</td>
+                    <td>0.00%</td>
+                    <td>200:17992</td>
+                </tr>
+
+                <tr>
+                    <td>Trending Ticker</td>
+                    <td>84.99</td>
+                    <td>30596</td>
+                    <td>2.67 ms</td>
+                    <td>22.31 ms</td>
+                    <td>109.20 ms</td>
+                    <td>0.00%</td>
+                    <td>200:30596</td>
+                </tr>
+
+                <tr>
+                    <td>Articles Search</td>
+                    <td>1.00</td>
+                    <td>360</td>
+                    <td>264.57 ms</td>
+                    <td>334.95 ms</td>
+                    <td>434.22 ms</td>
+                    <td>0.00%</td>
+                    <td>200:360</td>
+                </tr>
+
+            </tbody>
+        </table>
+    </div>
+
+    <div class="panel">
+        <h2>Throughput by Endpoint</h2>
+
+        <div class="chart-row">
+            <div class="chart-label">Articles List Main</div>
+            <div class="bar-wrap">
+                <div class="bar rps" style="width:100%"></div>
+            </div>
+            <div class="chart-value">324.91 RPS</div>
+        </div>
+
+        <div class="chart-row">
+            <div class="chart-label">Articles List Category</div>
+            <div class="bar-wrap">
+                <div class="bar rps" style="width:15.381853311561184%"></div>
+            </div>
+            <div class="chart-value">49.98 RPS</div>
+        </div>
+
+        <div class="chart-row">
+            <div class="chart-label">Trending Ticker</div>
+            <div class="bar-wrap">
+                <div class="bar rps" style="width:26.15735793244364%"></div>
+            </div>
+            <div class="chart-value">84.99 RPS</div>
+        </div>
+
+        <div class="chart-row">
+            <div class="chart-label">Articles Search</div>
+            <div class="bar-wrap">
+                <div class="bar rps" style="width:0.3077738546110508%"></div>
+            </div>
+            <div class="chart-value">1.00 RPS</div>
+        </div>
+
+    </div>
+
+    <div class="panel">
+        <h2>P95 Latency by Endpoint</h2>
+
+        <div class="chart-row">
+            <div class="chart-label">Articles List Main</div>
+            <div class="bar-wrap">
+                <div class="bar latency" style="width:7.465544850979835%"></div>
+            </div>
+            <div class="chart-value">25.01 ms p95</div>
+        </div>
+
+        <div class="chart-row">
+            <div class="chart-label">Articles List Category</div>
+            <div class="bar-wrap">
+                <div class="bar latency" style="width:7.742636407233822%"></div>
+            </div>
+            <div class="chart-value">25.93 ms p95</div>
+        </div>
+
+        <div class="chart-row">
+            <div class="chart-label">Trending Ticker</div>
+            <div class="bar-wrap">
+                <div class="bar latency" style="width:6.660213061860025%"></div>
+            </div>
+            <div class="chart-value">22.31 ms p95</div>
+        </div>
+
+        <div class="chart-row">
+            <div class="chart-label">Articles Search</div>
+            <div class="bar-wrap">
+                <div class="bar latency" style="width:100%"></div>
+            </div>
+            <div class="chart-value">334.95 ms p95</div>
+        </div>
+
+    </div>
+</body>
+
+</html>
