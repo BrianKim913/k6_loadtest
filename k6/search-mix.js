@@ -23,7 +23,10 @@ import {
 // where every dropdown keystroke beats the DB but only one in N actually
 // commits to a fulltext search. Tune via env vars below.
 
-export const handleSummary = makeHandleSummary('search-mix');
+export const handleSummary = makeHandleSummary('search-mix', [
+  { metric: 'autocomplete', label: 'Autocomplete' },
+  { metric: 'fulltext', label: 'Fulltext Search' },
+]);
 
 const KNOWN_ENDPOINTS = ['autocomplete', 'fulltext'];
 const KNOWN_STATUSES = ['200', '400', '401', '403', '404', '429', '500', '502', '503', '504'];

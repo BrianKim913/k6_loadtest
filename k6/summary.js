@@ -77,14 +77,18 @@ function endpointRow(data, metricName, label, durationMs) {
   };
 }
 
-function buildBenchmark(data) {
+const DEFAULT_ENDPOINTS = [
+  { metric: 'list_main', label: 'Articles List Main' },
+  { metric: 'list_category', label: 'Articles List Category' },
+  { metric: 'ticker', label: 'Trending Ticker' },
+  { metric: 'search', label: 'Articles Search' },
+];
+
+function buildBenchmark(data, endpoints, runName) {
   const durationMs = data.state && data.state.testRunDurationMs ? data.state.testRunDurationMs : 0;
-  const rows = [
-    endpointRow(data, 'list_main', 'Articles List Main', durationMs),
-    endpointRow(data, 'list_category', 'Articles List Category', durationMs),
-    endpointRow(data, 'ticker', 'Trending Ticker', durationMs),
-    endpointRow(data, 'search', 'Articles Search', durationMs),
-  ];
+  const rows = endpoints.map(({ metric, label }) =>
+    endpointRow(data, metric, label, durationMs)
+  );
 
   const httpReqs = safeMetric(data, 'http_reqs');
   const httpReqDuration = safeMetric(data, 'http_req_duration');
@@ -100,7 +104,7 @@ function buildBenchmark(data) {
 
   return {
     buildLabel: __ENV.BUILD_LABEL || 'unknown-build',
-    runName: __ENV.RUN_NAME || 'profile-mix',
+    runName: __ENV.RUN_NAME || runName,
     baseUrl: __ENV.BASE_URL || 'http://devport.kr',
     duration: durationMs,
     totals: {
@@ -307,9 +311,9 @@ function renderHtml(report) {
 </html>`;
 }
 
-export function makeHandleSummary(prefix = 'profile-mix') {
+export function makeHandleSummary(prefix = 'profile-mix', endpoints = DEFAULT_ENDPOINTS) {
   return function handleSummary(data) {
-    const report = buildBenchmark(data);
+    const report = buildBenchmark(data, endpoints, prefix);
     const base = `results/${prefix}-${report.buildLabel}`;
 
     return {
